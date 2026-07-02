@@ -1,5 +1,11 @@
 # Setting Up Pi-hole on Raspberry Pi 4
 
+## Network Overview
+This setup is part of a larger home lab project. 
+See the full network topology diagram below:
+
+![Network Diagram](Screenshots/pihole-setup/network-topology.png)
+
 ## What is a Raspberry Pi?
 A Raspberry Pi is a small, affordable single-board computer that can be used for a variety of projects including home automation, media centers, retro gaming, and network security tools.
 
