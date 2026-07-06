@@ -504,7 +504,7 @@ opened by the pihole-FTL process.
 | 5353 | UDP | mDNS |
 | 46501 | UDP | Pi-hole FTL (dynamic) |
 
-<img src="Screenshots/wazuh-setup/s1.png" width="600" alt="Port Status Alert">
+<img src="Screenshots/wazuh-setup/s1.png" width="1000" alt="Port Status Alert">
 <p><em>Wazuh alert showing listened port status changed on Raspberry Pi</em></p>
 
 **Verdict: False Positive**
@@ -541,7 +541,7 @@ Multiple failed SSH authentication attempts were
 detected on the Wazuh-SIEM server originating 
 from IP 192.168.1.165 which is the Windows laptop.
 
-<img src="Screenshots/wazuh-setup/s2.png" width="600" alt="Failed Authentication Alert">
+<img src="Screenshots/wazuh-setup/s2.png" width="1000" alt="Failed Authentication Alert">
 <p><em>Wazuh Level 10 alert showing failed SSH authentication attempts</em></p>
 
 **MITRE ATT&CK Mapping:**
@@ -586,3 +586,271 @@ This is one of the most common attack techniques
 against SSH servers and is directly relevant 
 to banking cybersecurity where protecting 
 administrative access is critical.
+
+### Alert 3: Trojaned File Detected
+
+**Alert Details:**
+
+| Field | Value |
+|---|---|
+| Rule ID | 510 |
+| Severity | Level 7 (Medium) |
+| Device | Raspberry Pi |
+| File | /usr/bin/diff |
+| Description | Trojaned version of file detected |
+| Fired Times | 16 |
+
+**Investigation:**
+
+Wazuh rootcheck detected suspicious characteristics 
+in /usr/bin/diff on the Raspberry Pi. The following 
+commands were run to investigate:
+
+```bash
+file /usr/bin/diff
+ls -la /usr/bin/diff
+md5sum /usr/bin/diff
+dpkg -V diffutils
+```
+
+**Findings:**
+- File type is a legitimate ELF 64-bit ARM binary
+- Owned by root with normal permissions
+- File date matches legitimate package installation
+- dpkg verification confirmed file integrity
+
+**Verdict: False Positive**
+
+Wazuh rootcheck flagged the file due to broad 
+signature matching. The file is a legitimate 
+system binary verified by the package manager.
+
+**Key Learning:**
+False positives are common in security monitoring. 
+A SOC analyst must investigate each alert rather 
+than assuming every alert is a real threat. 
+This process is called **alert triage**.
+
+---
+
+### Alert 4: Pi-hole Blocked Domain Detected
+
+**Alert Details:**
+
+| Field | Value |
+|---|---|
+| Rule ID | 100201 |
+| Severity | Level 6 (Medium) |
+| Device | Raspberry Pi (192.168.1.193) |
+| Blocked Domain | beacons5.gvt2.com |
+| Resolved To | 0.0.0.0 (blocked) |
+| Fired Times | 655 |
+| Time | 2026-07-06 16:35:42 |
+
+**Investigation:**
+
+Wazuh detected Pi-hole blocking a known Google 
+tracking domain. The domain beacons5.gvt2.com 
+is part of Google's beacon tracking network 
+used to track user behavior across websites.
+
+Pi-hole resolved the domain to 0.0.0.0 which 
+means the request was blocked before it could 
+reach Google's tracking servers.
+
+<img src="Screenshots/wazuh-setup/s4.png" width="1000" alt="Pi-hole Blocked Domain Alert">
+<p><em>Wazuh alert showing Pi-hole blocking a Google tracking domain</em></p>
+
+**Verdict: True Positive — Expected Behavior**
+
+This is Pi-hole working correctly. The domain 
+is on the StevenBlack blocklist installed during 
+Pi-hole setup. No action required.
+
+**Key Learning:**
+
+This alert demonstrates the integration between 
+Pi-hole and Wazuh. DNS blocking events from 
+Pi-hole are now visible as security events in 
+the Wazuh SIEM dashboard giving complete 
+visibility into network DNS activity including:
+
+- What domains devices are trying to access
+- Which domains are being blocked
+- How many block attempts occur
+- Which devices are generating the traffic
+
+This is directly relevant to SOC analyst work 
+where monitoring DNS traffic is a key indicator 
+of potential malware or data exfiltration attempts.
+
+---
+
+### Alert 5: Windows System Error Event
+
+**Alert Details:**
+
+| Field | Value |
+|---|---|
+| Rule ID | 61102 |
+| Severity | Level 5 |
+| Device | Windows Laptop (Olamide_Lami) |
+| Source | ACPI Power Management |
+| Event ID | 13 |
+
+**Investigation:**
+
+Wazuh detected a Windows system error from the 
+ACPI subsystem on the Windows laptop. The error 
+indicates the Embedded Controller did not respond 
+within the timeout period.
+
+<img src="Screenshots/wazuh-setup/s5.png" width="1000" alt="Windows System Error Alert">
+<p><em>Wazuh alert showing Windows ACPI system error on laptop</em></p>
+
+**Verdict: False Positive**
+
+This is a common hardware warning on laptops 
+related to power management. It does not indicate 
+a security threat and requires no action.
+
+**Key Learning:**
+
+Wazuh monitors Windows Event logs automatically 
+when the Windows agent is installed. This gives 
+visibility into both security events and system 
+health events from Windows devices on the network.
+
+## Part 7: Connecting Pi-hole Logs to Wazuh
+
+To get Pi-hole DNS logs appearing as security 
+events in Wazuh two things were needed:
+
+1. Configure the Raspberry Pi agent to read 
+   the Pi-hole log file
+2. Create custom Wazuh rules to parse and 
+   display Pi-hole events
+
+### Step 1: Configure Pi-hole Log Collection
+
+SSH into your Raspberry Pi:
+
+```bash
+ssh homelab@192.168.1.193
+```
+
+Edit the Wazuh agent configuration:
+
+```bash
+sudo nano /var/ossec/etc/ossec.conf
+```
+
+Add the following before the closing 
+`</ossec_config>` tag:
+
+```xml
+<localfile>
+  <log_format>syslog</log_format>
+  <location>/var/log/pihole/pihole.log</location>
+</localfile>
+```
+
+Restart the Wazuh agent:
+
+```bash
+sudo systemctl restart wazuh-agent
+```
+
+### Step 2: Create Custom Pi-hole Rules
+
+SSH into your Wazuh VM:
+
+```bash
+ssh wazuh@192.168.1.197
+```
+
+Create a new rules file:
+
+```bash
+sudo nano /var/ossec/etc/rules/pihole-rules.xml
+```
+
+Add the following rules:
+
+```xml
+<group name="pihole,">
+  <rule id="100200" level="3">
+    <match>dnsmasq</match>
+    <description>Pi-hole DNS query detected</description>
+  </rule>
+
+  <rule id="100201" level="6">
+    <match>gravity blocked</match>
+    <description>Pi-hole blocked a domain</description>
+  </rule>
+</group>
+```
+
+Restart Wazuh manager:
+
+```bash
+sudo systemctl restart wazuh-manager
+```
+
+### Step 3: Verify Pi-hole Events in Dashboard
+
+Go to your Wazuh dashboard and filter by:
+
+- Field: **location**
+- Operator: **is**
+- Value: **/var/log/pihole/pihole.log**
+
+You should see:
+- **Rule 100200** — Pi-hole DNS queries
+- **Rule 100201** — Pi-hole blocked domains
+
+<img src="Screenshots/wazuh-setup/s6.png" width="1000" alt="Pi-hole events in Wazuh">
+<p><em>Wazuh dashboard showing Pi-hole DNS query events</em></p>
+
+> Note: Rule 100201 fired 655 times showing 
+> Pi-hole is actively blocking tracking and 
+> ad domains on the network.
+
+## Troubleshooting
+
+### Windows Agent Keeps Stopping
+
+If your Windows Wazuh agent starts but immediately 
+stops check the agent log for configuration errors:
+
+```powershell
+Get-Content "C:\Program Files (x86)\ossec-agent\ossec.log" -Tail 20
+```
+
+If you see errors like:
+
+ERROR: No such tag 'users' at module 'syscollector'
+
+ERROR: No such tag 'services' at module 'syscollector'
+
+Open the agent config file:
+
+```powershell
+notepad "C:\Program Files (x86)\ossec-agent\ossec.conf"
+```
+
+Remove these unsupported tags from the 
+`<wodle name="syscollector">` section:
+
+```xml
+<users>yes</users>
+<groups>yes</groups>
+<services>yes</services>
+<browser_extensions>yes</browser_extensions>
+```
+
+Save and restart:
+
+```powershell
+NET START WazuhSvc
+```
