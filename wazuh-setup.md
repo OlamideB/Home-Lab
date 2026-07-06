@@ -459,3 +459,130 @@ test email within a few minutes.
 > Subsystem** notification — this is normal when 
 > using the same email address for both sender 
 > and receiver and can be safely ignored.
+
+
+
+
+## Part 6: Investigating Security Alerts
+
+As a SOC analyst investigating alerts is a core 
+responsibility. Not every alert is a real threat 
+— determining whether an alert is a true positive 
+or false positive is called **alert triage**.
+
+---
+
+### Alert 1: Listened Port Status Changed
+
+**Alert Details:**
+
+| Field | Value |
+|---|---|
+| Rule ID | 533 |
+| Severity | Level 7 (Medium) |
+| Device | Raspberry Pi (192.168.1.193) |
+| Time | 2026-07-06 04:08:39 |
+| Description | Listened ports status changed |
+
+**Investigation:**
+
+Wazuh detected a new port opening on the 
+Raspberry Pi. Comparing the before and after 
+port lists revealed that UDP port 46501 was 
+opened by the pihole-FTL process.
+
+**Open ports on Raspberry Pi:**
+
+| Port | Protocol | Service |
+|------|----------|---------|
+| 22 | TCP | SSH |
+| 53 | TCP/UDP | Pi-hole DNS |
+| 80 | TCP | Pi-hole Web Interface |
+| 111 | TCP/UDP | RPC |
+| 123 | UDP | NTP Time Sync |
+| 443 | TCP | Pi-hole HTTPS |
+| 5353 | UDP | mDNS |
+| 46501 | UDP | Pi-hole FTL (dynamic) |
+
+<img src="Screenshots/wazuh-setup/s1.png" width="600" alt="Port Status Alert">
+<p><em>Wazuh alert showing listened port status changed on Raspberry Pi</em></p>
+
+**Verdict: False Positive**
+
+The new port was opened by pihole-FTL which 
+is the Pi-hole process. This is expected 
+behavior as Pi-hole uses dynamic high ports 
+for DNS query resolution. No action required.
+
+**Compliance Frameworks Triggered:**
+- PCI DSS 10.2.7, 10.6.1
+- HIPAA 164.312.b
+- NIST 800-53
+
+---
+
+### Alert 2: Failed Authentication Attempts
+
+**Alert Details:**
+
+| Field | Value |
+|---|---|
+| Rule ID | 2502 |
+| Severity | Level 10 (High) |
+| Device | Wazuh-SIEM Server |
+| Source IP | 192.168.1.165 (Windows Laptop) |
+| Time | 2026-07-06 04:07:59 |
+| Description | User missed password more than once |
+| Fired Times | 2 |
+
+**Investigation:**
+
+Multiple failed SSH authentication attempts were 
+detected on the Wazuh-SIEM server originating 
+from IP 192.168.1.165 which is the Windows laptop.
+
+<img src="Screenshots/wazuh-setup/s2.png" width="600" alt="Failed Authentication Alert">
+<p><em>Wazuh Level 10 alert showing failed SSH authentication attempts</em></p>
+
+**MITRE ATT&CK Mapping:**
+
+| Field | Value |
+|---|---|
+| Technique | Brute Force |
+| ID | T1110 |
+| Tactic | Credential Access |
+
+**Compliance Frameworks Triggered:**
+- PCI DSS 10.2.4, 10.2.5
+- HIPAA 164.312.b
+- NIST 800-53
+- GDPR
+
+**Verdict: False Positive**
+
+This was a controlled test performed to verify 
+Wazuh alert detection capabilities. The failed 
+login attempts were intentionally triggered from 
+the Windows laptop to confirm Wazuh was correctly 
+detecting and alerting on authentication failures.
+
+**Key Learning:**
+
+In a real environment a Level 10 alert would 
+require immediate investigation:
+
+1. Check if the source IP is a known asset
+2. Check if the username exists on the system
+3. Check if any login was successful
+4. If unknown IP — block it immediately
+5. If successful login after failures — 
+   account may be compromised
+
+**MITRE ATT&CK T1110 - Brute Force:**
+
+Attackers use brute force techniques to gain 
+access by systematically trying passwords. 
+This is one of the most common attack techniques 
+against SSH servers and is directly relevant 
+to banking cybersecurity where protecting 
+administrative access is critical.
