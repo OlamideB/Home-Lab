@@ -449,7 +449,6 @@ test email within a few minutes.
 <p><em>Wazuh test email received in Gmail confirming alerts are working</em></p>
 
 
-
 > Note: If you do not receive the email check 
 > your **Spam folder** first. Also verify your 
 > App Password has no spaces and is entered correctly 
@@ -460,6 +459,62 @@ test email within a few minutes.
 > using the same email address for both sender 
 > and receiver and can be safely ignored.
 
+### Step 9: Configure Email Alert Level
+
+By default Wazuh only sends email alerts for 
+Level 12 and above. For testing purposes this 
+was changed to Level 10 so alerts for high 
+severity events like brute force attempts 
+are received via email.
+
+Edit the Wazuh configuration file:
+
+```bash
+sudo nano /var/ossec/etc/ossec.conf
+```
+
+Find the `<global>` section and add:
+
+```xml
+<email_alert_level>10</email_alert_level>
+```
+
+Save and restart Wazuh manager:
+
+```bash
+sudo systemctl restart wazuh-manager
+```
+
+> Note: In a production environment the alert 
+> level threshold should be carefully considered 
+> to avoid alert fatigue from too many emails. 
+> Level 12+ is recommended for production 
+> while Level 7-10 is suitable for testing 
+> and home lab environments.
+
+### Step 10: Verify Real Email Alert
+
+To confirm email alerts are working with real 
+security events trigger a brute force alert 
+by attempting multiple failed SSH logins:
+
+```powershell
+ssh wronguser@192.168.1.197
+```
+
+Enter wrong password 5+ times. You should 
+receive a Wazuh email alert containing:
+
+- Rule ID: 5712
+- Severity: Level 10 (High)
+- Description: SSHD Brute force trying to 
+  get access to the system
+- Source IP of the attacking machine
+- Portion of the actual system logs
+
+<img src="Screenshots/wazuh-setup/wazuh-brute-force-email.png" width="600" alt="Brute Force Email Alert">
+<p><em>Wazuh email alert received for brute force SSH attempt containing 
+rule details source IP and log excerpts</em></p>
 
 
 
