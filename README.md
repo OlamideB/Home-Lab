@@ -17,9 +17,9 @@ and security monitoring.
 - Kali Linux
 - Raspberry Pi 4
 - Pi-hole DNS Filter
-- pfSense Firewall (Planned)
-- Wazuh SIEM (Planned)
-- DVWA (Planned)
+- pfSense Firewall
+- Wazuh SIEM
+- DVWA
 
 ## Documentation
 
@@ -27,9 +27,12 @@ and security monitoring.
 |---|---|
 | [Ubuntu VM Installation](ubuntu-vm-install.md) | Step-by-step guide to installing Ubuntu on VirtualBox |
 | [Pi-hole Setup](pihole-setup.md) | Setting up Pi-hole on Raspberry Pi 4 |
+| [Wazuh SIEM Setup](wazuh-setup.md) | Deploying Wazuh SIEM and custom detection rules mapped to MITRE ATT&CK |
+| [pfSense Firewall Setup](pfsense-setup.md) | Configuring pfSense as a network firewall |
+| [DVWA Setup & Attack Simulation](dvwa-setup.md) | Installing DVWA, simulating a brute force attack, and identifying a Wazuh detection gap |
 
 ## Project Status
-🔄 In Progress
+🔄 In Progress — core infrastructure (VM setup, Pi-hole, Wazuh, pfSense, DVWA) complete; closing the Apache log detection gap and expanding attack simulations are next
 
 ## Author
 OlamideB
