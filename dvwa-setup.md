@@ -256,3 +256,63 @@ attacks against DVWA including:
 Wazuh will monitor and detect these attacks 
 generating security alerts for investigation 
 and incident reporting.
+
+
+---
+
+## Phase 6: Attack Simulation Results
+
+### Brute Force Attack (Hydra)
+
+**Attack Command:**
+
+```bash
+hydra -l admin -P /usr/share/wordlists/rockyou.txt 192.168.1.244 http-post-form "/dvwa/login.php:username=^USER^&password=^PASS^&Login=Login:Login failed" -V -t 4
+```
+
+**Command breakdown:**
+
+- `hydra` — the brute-force tool itself
+- `-l admin` — single login name to try (DVWA's default username, not guessing usernames)
+- `-P /usr/share/wordlists/rockyou.txt` — password wordlist; Hydra tries every line in this file as a password (rockyou.txt contains ~14 million real passwords leaked from past data breaches)
+- `192.168.1.244` — target IP (the DVWA VM)
+- `http-post-form` — tells Hydra the login happens via an HTTP POST form, not SSH/FTP/etc.
+- `"/dvwa/login.php:username=^USER^&password=^PASS^&Login=Login:Login failed"` — the form details, split by colons:
+  - `/dvwa/login.php` — the page the login form submits to
+  - `username=^USER^&password=^PASS^&Login=Login` — the form fields; `^USER^` and `^PASS^` are placeholders Hydra fills in with each attempt
+  - `Login failed` — the string Hydra looks for to decide an attempt failed (if this text is missing from the response, Hydra assumes success)
+- `-V` — verbose mode, shows every individual login attempt as it happens
+- `-t 4` — run 4 parallel threads to speed up the attack
+
+**Attack ran from:** Kali attacker VM (192.168.1.200)
+
+**Result:**
+
+![Hydra brute force attack output](Screenshots/dvwa-setup/hydra-attack.png)
+
+Hydra reported 4 "valid" passwords found within 2 seconds. Manual 
+verification by logging into DVWA directly through a browser showed 
+these credentials did NOT actually work — Hydra's "Login failed" 
+string match was misconfigured against DVWA's actual failure 
+response, producing false positives rather than a real crack.
+
+### Detection Gap Identified
+
+Despite the brute-force traffic hitting DVWA's login page, Wazuh's 
+Security Events for the DVWA agent (004) showed:
+- 0 authentication failures
+- 1 unrelated authentication success (from an earlier sudo session)
+- No alerts logged at the actual attack timestamp (15:46)
+
+![Wazuh Security Events dashboard showing no attack-related alerts](Screenshots/dvwa-setup/wazuh-siem.png)
+
+![Security Alerts table showing only unrelated 15:05 setup events](Screenshots/dvwa-setup/security-alert-table.png)
+
+**Root cause:** The Wazuh agent on the DVWA VM monitors OS-level 
+logs (auth.log, sudo, PAM, CIS compliance) by default, but does not 
+ingest Apache's web server logs. Web-application-layer attacks are 
+therefore invisible to Wazuh out of the box.
+
+**Next step:** Configure the Wazuh agent to forward Apache access/
+error logs and add detection rules for repeated failed login POST 
+requests to close this gap.
